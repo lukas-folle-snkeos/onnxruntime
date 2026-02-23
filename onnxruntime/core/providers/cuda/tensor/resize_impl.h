@@ -88,8 +88,7 @@ void ResizeImpl(
     bool exclude_outside,
     onnxruntime::ResizeCoordinateTransformationMode coordinate_transform_mode,
     onnxruntime::ResizeNearestMode nearest_mode,
-    void* dims_mapping,
-    size_t dims_mapping_buffer_size);
+    void* dims_mapping);
 
 using TempSpaceAllocateFunc = std::function<onnxruntime::IAllocatorUniquePtr<uint8_t>(size_t buffer_size)>;
 

@@ -742,7 +742,6 @@ void ResizeImpl(
   int64_t output_depth = is_3D ? output_shape[rank - 3] : 0;
   int64_t output_height = output_shape[rank - 2];
   int64_t output_width = output_shape[rank - 1];
-
   int blocksPerDimsMappingGrid =
       static_cast<int>(ceil((output_depth + output_height + output_width) / 32.0));
 

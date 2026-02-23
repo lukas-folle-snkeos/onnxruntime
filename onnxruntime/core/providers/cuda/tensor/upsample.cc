@@ -283,7 +283,8 @@ Status Upsample<T>::BaseCompute(OpKernelContext* context,
                  output_count, use_extrapolation_, ToCudaType<T>::FromFloat(extrapolation_value_),
                  cubic_coeff_a_, exclude_outside_,
                  coordinate_transform_mode_, nearest_mode_,
-                 dims_mapping);
+                 dims_mapping,
+                 temp_buffer_size);
     }
   } else {
     TArray<fast_divmod> scales_div(rank);

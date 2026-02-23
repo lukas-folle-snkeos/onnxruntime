@@ -585,8 +585,15 @@ size_t CalcResizeBufferSize(const onnxruntime::UpsampleMode upsample_mode,
                  static_cast<size_t>(std::accumulate(output_dims.begin(),
                                                      output_dims.end(), (int64_t)0));
     case UpsampleMode::LINEAR:
-      return sizeof(LinearMappingInfo) *
-             static_cast<size_t>(std::accumulate(output_dims.rbegin(), output_dims.rbegin() + 2, (int64_t)0));
+          // For LINEAR mode:
+          // - bilinear (2-D/4-D) uses mapping for [H, W]
+          // - trilinear (3-D/5-D) uses mapping for [D, H, W]
+          if (output_dims.size() == 3 || output_dims.size() == 5) {
+       return sizeof(LinearMappingInfo) *
+         static_cast<size_t>(std::accumulate(output_dims.rbegin(), output_dims.rbegin() + 3, (int64_t)0));
+          }
+          return sizeof(LinearMappingInfo) *
+            static_cast<size_t>(std::accumulate(output_dims.rbegin(), output_dims.rbegin() + 2, (int64_t)0));
     case UpsampleMode::CUBIC:
       return sizeof(CubicMappingInfo) *
              static_cast<size_t>(std::accumulate(output_dims.rbegin(), output_dims.rbegin() + 2, (int64_t)0));
@@ -700,7 +707,8 @@ void ResizeImpl(
     bool exclude_outside,
     ResizeCoordinateTransformationMode coordinate_transform_mode,
     ResizeNearestMode nearest_mode,
-    void* dims_mapping) {
+    void* dims_mapping,
+    size_t dims_mapping_buffer_size) {
   if (upsample_mode == UpsampleMode::NN) {
     ResizeNearestImpl(
         stream, rank, input_shape, output_shape, input_strides, output_div_pitches,
@@ -735,6 +743,23 @@ void ResizeImpl(
   int64_t output_depth = is_3D ? output_shape[rank - 3] : 0;
   int64_t output_height = output_shape[rank - 2];
   int64_t output_width = output_shape[rank - 1];
+
+  if (upsample_mode == UpsampleMode::LINEAR) {
+    const size_t required_elems = static_cast<size_t>(
+        is_3D ? (output_depth + output_height + output_width)
+              : (output_height + output_width));
+    const size_t required_bytes = required_elems * sizeof(LinearMappingInfo);
+    ORT_ENFORCE(
+        dims_mapping_buffer_size >= required_bytes,
+        "Resize LINEAR dims_mapping buffer too small: required ", required_bytes,
+        " bytes (rank=", rank,
+        ", output_depth=", output_depth,
+        ", output_height=", output_height,
+        ", output_width=", output_width,
+        "), but got ", dims_mapping_buffer_size,
+        " bytes. This would cause invalid CUDA global writes.");
+  }
+
   int blocksPerDimsMappingGrid =
       static_cast<int>(ceil((output_depth + output_height + output_width) / 32.0));
 
@@ -827,7 +852,8 @@ void ResizeImpl(
       bool exclude_outside,                                         \
       ResizeCoordinateTransformationMode coordinate_transform_mode, \
       ResizeNearestMode nearest_mode,                               \
-      void* dims_mapping);
+      void* dims_mapping,                                             \
+      size_t dims_mapping_buffer_size);
 
 SPECIALIZED_IMPL(float)
 SPECIALIZED_IMPL(double)
